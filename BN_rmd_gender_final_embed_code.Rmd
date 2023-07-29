@@ -21,9 +21,9 @@ library(bnviewer)
 #Set working directory and load dataset as BN_data <- read_sav("provide file location")
 ```{r include=FALSE}
 
-setwd("C:/Users/Brian/Google Drive/UNIVERSITY/PhD/Rfiles/sex_gambling/BN")
+setwd("working directory location")
 
-BN_data <- read_sav("C:/Users/Brian/Google Drive/UNIVERSITY/PhD/Rfiles/sex_gambling/BN/cs_dataset_937_labelled.sav") 
+BN_data <- read_sav("dataset location") 
 ```
 
 ```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
