@@ -1,0 +1,270 @@
+---
+title: "Network Analysis of Sex Addiction and Gambling Disorder"
+author: "BH"
+date: '`r Sys.Date()`'
+output: html_document
+---
+
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+library(bootnet)
+library(haven)
+library(networktools)
+library(NetworkComparisonTest)
+library(qgraph)
+library(tidyverse)
+library(naniar)
+library(mice)
+library(VIM)
+library(psych)
+library(formatR)
+```
+
+#Set working directory and load dataset as Data <- read_sav("provide file location")
+```{r include=FALSE}
+
+setwd("C:/Users/Brian/Google Drive/UNIVERSITY/PhD/Rfiles/sex_gambling/NA")
+
+Data <- read_sav("C:/Users/Brian/Google Drive/UNIVERSITY/PhD/Rfiles/sex_gambling/NA/cs_dataset_937_labelled.sav")
+
+##omega(Data)
+```
+
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+
+## How many participants by gender?
+Data%>%
+  group_by(Gender)%>%
+  count()
+```
+
+
+#Percentage of missing data in the dataset
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+D1 <- Data%>%
+  select(5,111:116,215:225)
+
+## This calculates % of missing data
+totalcells <- prod(dim(D1))
+missingcells <- sum(is.na(D1))
+perc <- (missingcells * 100)/(totalcells)
+perc
+
+mcar_test(D1)
+```
+
+#Variables with highest number of missing values
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+D1 %>%
+  select(!1) %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(cols = everything(), names_to = "names", values_to = "values") %>%
+  arrange(desc(values)) %>%
+  mutate(perc=(values)/937) %>%
+  slice_head(n = 20)
+```
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+
+## Data imputation with Predictive Mean Matching (PMM) and 50 iterations 
+D2 <- sapply(D1, haven::zap_labels) ## this line converts doubles into integers
+imputed_data <- mice(D2, m=5, maxit = 50, method = 'pmm', seed = 500)
+summary(imputed_data)
+completeData <- as_tibble(complete(imputed_data,2))
+#write_sav(completeData, "Complete_data.sav")
+
+D3 <- read_sav("Complete_data.sav")
+
+view(D3)
+D_sex_reliability <- D3%>%
+  select(2:7)
+
+omega(D_sex_reliability)
+
+D_OGD_reliability <- D3%>%
+  select(8:18)
+
+omega(D_OGD_reliability)
+
+D4 <- D3 %>%
+  select(!Gender)
+
+Males <- D3 %>%
+  filter(Gender==1)%>%
+  select(!Gender)
+
+Females <- D3 %>%
+  filter(Gender==0) %>%
+  select(!Gender)
+```
+#Estimate network
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+network1 <- estimateNetwork(D4, default="EBICglasso")
+network1
+
+```
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+#b1 <- bootnet(Bnetwork1, boots=5000, type="nonparametric", nCores = 8,
+#               statistics=c("strength", "expectedInfluence", "edge"))
+#b2 <- bootnet(Bnetwork1, boots=5000, type="case", nCores = 8,
+ #             statistics = c('strength','expectedInfluence'))
+
+#saveRDS(b1, file = "b1.RDS")
+#saveRDS(b2, file = "b2.RDS")
+b1 <- readRDS("b1.RDS")
+b2 <- readRDS("b2.RDS")
+
+
+```
+
+#Correlation stability coefficient and plot
+CS larger than 0.7 is excellent, 0.5 < CS < 0.7 is acceptable, CS < 0.5 not acceptable
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+corStability(b2)
+plot(b2, "all")
+
+#pdf("edge_stability.pdf")
+plot(b1, labels = F, order = "sample")
+#dev.off()
+```
+
+
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+## Plot network - OVERALL
+```
+
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+## Plot centrality indices and centrality table
+```
+
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+## Plot bridge symptoms
+```
+
+#Estimate and plot male network
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+groups1 <- list("BYSAS" = c(1:6),"OGD"=c(7:17)) 
+Names <- c("Time thinking about sex", "Increased sexual urges", "Used sex to escape", "Unsuccessfully reduce sex", "Troubled if prohibited from sex", "Sex has negative impact on life", "Gamble more to achieve same high", "Irritated when gambling reduced", "Unsuccessfully reduce gambling", "Gamble despite consequences", "Time thinking about gambling", "Use gambling to escape", "Little control over gambling", "Chasing losses", "Lie about gambling", "Borrow money due to gambling", "Prioritise gambling")
+
+male_network <- as_tibble(getWmat(network_males <- estimateNetwork(Males, default = "EBICglasso")))
+
+network_males
+
+qgraph(male_network, groups=groups1, nodeNames = Names, color = c('lightblue','orange'), layout = "spring",
+               minimum = 0, cut = 0, curveAll = F, curveDefault = 0.5,
+       label.color="black", label.prop = 1, label.scale = T, label.scale.equal = T,
+       legend.cex = 0.4, font = 2, vsize = 4, posCol = "dark green",
+       borders = T, border.color = 'black', border.width = 0.2,
+       vTrans = 220, usePCH = F, node.resolution = 150) #,filetype='tiff',filename="malenetwork")
+```
+
+#Estimate and plot female network
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+female_network <- as_tibble(getWmat(network_females <- estimateNetwork(Females, default = "EBICglasso")))
+
+network_females
+
+qgraph(female_network, groups=groups1, nodeNames = Names, color = c('lightblue','orange'), layout = "spring",
+               minimum = 0, cut = 0, curveAll = F, curveDefault = 0.5,
+       label.color="black", label.prop = 1, label.scale = T, label.scale.equal = T,
+       legend.cex = 0.4, font = 2, vsize = 4, posCol = "dark green",
+       borders = T, border.color = 'black', border.width = 0.2,
+       vTrans = 220, usePCH = F, node.resolution = 150) #,filetype='tiff',filename="femalenetwork")
+```
+#Network Comparison Test
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+Comparison <- NCT(network_males, network_females, gamma, it=100, binary.data = FALSE, 
+                   paired = FALSE, weighted=TRUE, AND=TRUE, test.edges = TRUE, edges = 'ALL')
+Comparison
+```
+
+
+#Plot centrality indices for males and females
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+cent_males <- as_tibble(centralityTable(network_males))
+## Females
+cent_females <- as_tibble(centralityTable(network_females))
+
+## Plot centrality indices for males and females
+cent_males$Gender <- 'Males'
+cent_females$Gender <- 'Females'
+many_BDF <- list(cent_females, cent_males)
+Gender <- as_tibble(Reduce(function(...) merge(..., all=T), many_BDF))
+
+write.csv(Gender, file = "Gender_centrality_index.csv")
+
+Gender <- read.csv("Gender_centrality_index.csv")
+
+Gender %>%
+  ggplot(aes(x = node,  y = value, color = Gender, group = Gender)) +
+  geom_point() +
+  geom_line(size=1.0) +
+  coord_flip() +
+  facet_wrap(~measure, nrow = 1)+
+  labs(x = "", y = "")
+
+## Write excel files with correlation matrices for males and females
+cor_mat_males <- as_tibble(getWmat(network_males))
+write_csv(cor_mat_males, "Correlation matrix males.csv")
+cor_mat_females <- as_tibble(getWmat(network_females))
+write_csv(cor_mat_females, "Correlation matrix females.csv")
+```
+
+#Bridge symptoms for males and females
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+
+## Prepping male data frame
+graph_males <- qgraph::EBICglasso(cor(Males), n=dim(Males)[1])
+BBb_males <- bridge(graph_males, communities = groups1)
+BBStrength_m <- BBb_males$`Bridge Strength`
+BBBetween_m <- BBb_males$`Bridge Betweenness`
+BBClose_m <- BBb_males$`Bridge Closeness`
+BBExpect_m <- BBb_males$`Bridge Expected Influence (1-step)`
+Bsymptoms_m <- Males%>%
+  pivot_longer(cols = c(1:17), names_to = "symptoms", values_to = "n")%>%
+  select(symptoms) %>%
+  slice_head(n=17)
+
+BBsymptoms_m <- as_tibble(Bsymptoms_m,BBStrength_m,BBBetween_m,BBClose_m,SBExpect_m)%>%
+  mutate(`Bridge strength` = (BBStrength_m - mean(BBStrength_m))/sd(BBStrength_m))%>%
+  mutate(`Bridge between` = (BBBetween_m - mean(BBBetween_m))/sd(BBBetween_m))%>%
+  mutate(`Bridge closeness` = (BBClose_m - mean(BBClose_m))/sd(BBClose_m))%>%
+  mutate(`Bridge expect inf` = (BBExpect_m - mean(BBExpect_m))/sd(BBExpect_m))%>%
+  pivot_longer(cols = c(2:5), names_to = "Bcent", values_to = "n")
+
+## Prepping female data frame
+graph_females <- qgraph::EBICglasso(cor(Females), n=dim(Females)[1])
+BBb_females <- bridge(graph_females, communities = groups1)
+BBStrength_f <- BBb_females$`Bridge Strength`
+BBBetween_f <- BBb_females$`Bridge Betweenness`
+BBClose_f <- BBb_females$`Bridge Closeness`
+BBExpect_f <- BBb_females$`Bridge Expected Influence (1-step)`
+Bsymptoms_f <- Females%>%
+  pivot_longer(cols = c(1:17), names_to = "symptoms", values_to = "n")%>%
+  select(symptoms) %>%
+  slice_head(n=17)
+
+BBsymptoms_f <- as_tibble(Bsymptoms_f,BBStrength_f,BBBetween_f,BBClose_f,BBExpect_f)%>%
+  mutate(`Bridge strength` = (BBStrength_f - mean(BBStrength_f))/sd(BBStrength_f))%>%
+  mutate(`Bridge between` = (BBBetween_f - mean(BBBetween_f))/sd(BBBetween_f))%>%
+  mutate(`Bridge closeness` = (BBClose_f - mean(BBClose_f))/sd(BBClose_f))%>%
+  mutate(`Bridge expect inf` = (BBExpect_f - mean(BBExpect_f))/sd(BBExpect_f))%>%
+  pivot_longer(cols = c(2:5), names_to = "Bcent", values_to = "n")
+
+## Plot centrality indices for males and females
+BBsymptoms_m$Gender <- 'Males'
+BBsymptoms_f$Gender <- 'Females'
+Brian_many_SDF_bridge <- list(BBsymptoms_m,BBsymptoms_f)
+B_bridge_Gender <- as_tibble(Reduce(function(...) merge(..., all=T), Brian_many_SDF_bridge))
+
+write.csv(B_bridge_Gender, file = "Bridge Centrality_gender.csv")
+
+B_bridge_Gender <- read.csv("Bridge Centrality_gender.csv")
+
+B_bridge_Gender %>%
+  ggplot(aes(x = symptoms,  y = n, color = Gender, group = Gender)) +
+  geom_point() +
+  geom_line(size=1.0) +
+  coord_flip() +
+  facet_wrap(~Bcent, nrow = 1)+
+  labs(x = "", y = "")
+```
+

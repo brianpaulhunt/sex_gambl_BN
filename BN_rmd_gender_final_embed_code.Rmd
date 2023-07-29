@@ -1,0 +1,188 @@
+---
+title: "Bayesian Network by Gender"
+author: "BH"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+always_allow_html: true
+---
+
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+library(haven) 
+library(tidyverse) 
+library(bnlearn) 
+library(qgraph) 
+library(mice) 
+library(bnviewer)
+```
+
+#Set working directory and load dataset as BN_data <- read_sav("provide file location")
+```{r include=FALSE}
+
+setwd("C:/Users/Brian/Google Drive/UNIVERSITY/PhD/Rfiles/sex_gambling/BN")
+
+BN_data <- read_sav("C:/Users/Brian/Google Drive/UNIVERSITY/PhD/Rfiles/sex_gambling/BN/cs_dataset_937_labelled.sav") 
+```
+
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+
+data <- BN_data %>%
+  select(5,111:116,215:225)
+
+non_labelled <- sapply(data, haven::zap_labels) ## removing labels to impute values
+Compdata <- as_tibble(complete(mice(non_labelled, m=5, maxit = 50, method = 'pmm', seed = 500),2))
+
+Males <- Compdata %>%
+  filter(Gender==1)%>%
+  select(!Gender)
+
+Females <- Compdata %>%
+  filter(Gender==0)%>%
+  select(!Gender)
+
+#cdata1 <- Compdata %>%
+#  select(!Gender)
+```
+
+#Male Network - Hill climbing algorithm is used to learn/determine the initial structure of the Bayesian network
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+BNhcMales <- hc(Males)
+BNhcMales
+```
+
+#Female Network - Hill climbing algorithm is used to learn/determine the initial structure of the Bayesian network
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+BNhcFemales <- hc(Females)
+BNhcFemales
+```
+
+#Male network is bootstrapped with 5000 iterations to obtain a stable network
+#Male network is averaged while retaining edges (arcs) which appear in 85% of the bootstrapped samples
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+
+#BSThcMale <- boot.strength(Males, R = 5000, algorithm = "hc",
+#                    debug = TRUE, cpdag = TRUE)
+
+#saveRDS(BSThcMale, file = "BSThcMale.RDS")
+BSThcMale <- readRDS("BSThcMale.RDS")
+
+write.csv(BSThcMale, file = "BSThcMale.csv")
+
+avgnetMale85 <- averaged.network(BSThcMale, threshold = 0.85)
+avgnetMale85
+
+```
+#Plot male network
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+
+bayesianNetwork.boot.strength.Male = BSThcMale
+#boot.strength(Males, R = 5000, algorithm = "hc")
+
+avg.bayesianNetwork.Male = averaged.network(bayesianNetwork.boot.strength.Male, threshold = 0.85)
+
+strength.viewer(
+	avg.bayesianNetwork.Male,
+	bayesianNetwork.boot.strength.Male,
+	bayesianNetwork.background = "white",
+	bayesianNetwork.arc.strength.threshold.expression = c("@threshold > 0 & @threshold < 0.85",
+								"@threshold >= 0.85 & @threshold <= 0.90",
+								"@threshold > 0.90 & @threshold <= 1"),
+
+	bayesianNetwork.arc.strength.threshold.expression.color  = c("grey", "light blue", "blue"),
+	bayesianNetwork.arc.strength.threshold.alternative.color =  "white",
+	
+	bayesianNetwork.arc.strength.tooltip = T,
+	
+	bayesianNetwork.edge.scale.min = .1,
+	bayesianNetwork.edge.scale.max = 5,
+	
+	bayesianNetwork.arc.strength.label = F,
+	bayesianNetwork.edge.scale.label.min = 12,
+	bayesianNetwork.edge.scale.label.max = 12,
+	node.shape = "circle",
+	node.size = 24,
+	node.colors = list(background = "#97c2fc",
+                     border = "#2b7ce9",
+                     highlight = list(background = "#e91eba",
+                                      border = "#2b7ce9")),
+node.label.prefix = "",
+  node.font = list(color = "black", face="source sans pro black"),
+	
+	bayesianNetwork.width = "100%",
+	bayesianNetwork.height = "800px",
+	bayesianNetwork.layout = "layout_with_sugiyama")
+
+```
+
+#Female network is bootstrapped with 5000 iterations to obtain a stable network
+#Female network is averaged while retaining edges (arcs) which appear in 85% of the bootstrapped samples
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+
+#BSThcFemale <- boot.strength(Females, R = 5000, algorithm = "hc",
+ #                          debug = TRUE, cpdag = TRUE)
+
+#saveRDS(BSThcFemale, file = "BSThcFemale.RDS")
+BSThcFemale <- readRDS("BSThcFemale.RDS")
+
+write.csv(BSThcFemale, file = "BSThcFemale.csv")
+
+avgnetFemale85 <- averaged.network(BSThcFemale, threshold = .85)
+avgnetFemale85
+
+```
+
+#Plot female network
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+
+bayesianNetwork.boot.strength.Female = BSThcFemale
+  #boot.strength(Females, R = 200, algorithm = "hc")
+
+avg.bayesianNetwork.Female = averaged.network(bayesianNetwork.boot.strength.Female, threshold = 0.85)
+
+strength.viewer(
+	avg.bayesianNetwork.Female,
+	bayesianNetwork.boot.strength.Female,
+	bayesianNetwork.background = "white",
+	bayesianNetwork.arc.strength.threshold.expression = c("@threshold > 0 & @threshold < 0.85",
+								"@threshold >= 0.85 & @threshold <= 0.9",
+								"@threshold > 0.9 & @threshold <= 1"),
+
+	bayesianNetwork.arc.strength.threshold.expression.color  = c("red", "light blue", "blue"),
+	bayesianNetwork.arc.strength.threshold.alternative.color =  "white",
+	
+	bayesianNetwork.arc.strength.tooltip = T,
+	
+	bayesianNetwork.edge.scale.min = .1,
+	bayesianNetwork.edge.scale.max = 5,
+	
+	bayesianNetwork.arc.strength.label = F,
+	bayesianNetwork.edge.scale.label.min = 12,
+	bayesianNetwork.edge.scale.label.max = 12,
+	node.shape = "circle",
+	node.size = 24,
+	node.colors = list(background = "#97c2fc",
+                     border = "#2b7ce9",
+                     highlight = list(background = "#e91eba",
+                                      border = "#2b7ce9")),
+node.label.prefix = "",
+  node.font = list(color = "black", face="source sans pro black"),
+	
+	bayesianNetwork.width = "100%",
+	bayesianNetwork.height = "800px",
+	bayesianNetwork.layout = "layout_with_sugiyama")
+
+```
+
+
+#Output of directed relationships in MALE bootstrapped model including estimates of strength and direction
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+BSThcMale
+```
+
+#Output of directed relationships in FEMALE bootstrapped model including estimates of strength and direction
+```{r echo=TRUE, tidy=TRUE, warning=FALSE, message=FALSE}
+BSThcFemale
+```
+
